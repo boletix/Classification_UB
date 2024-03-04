@@ -68,6 +68,10 @@ def model_eval(model, Xt, Xv, yt, yv):
 def main(cat_imputer, n_iter, max_depth):
     # Load CSV file
     data = pd.read_csv('adult.csv')
+
+    mlflow.log_param("cat_imputer", cat_imputer)
+    mlflow.log_param("n_iter", n_iter)
+    mlflow.log_param("max_depth", max_depth)
     
     # Transform income to target
     target_names = data.income.unique()
@@ -76,60 +80,53 @@ def main(cat_imputer, n_iter, max_depth):
     # Apply the preprocessing
     data_preprocess = preprocessing(data)
 
-    mlflow.log_param("cat_imputer", cat_imputer)
-    mlflow.log_param("n_iter", n_iter)
-    mlflow.log_param("max_depth", max_depth)
+    # Split columns in categorical and numerical
+    num_vars = data_preprocess.drop(columns='income').select_dtypes(exclude=['object']).columns
+    cat_vars = data_preprocess.drop(columns='income').select_dtypes(include=['object']).columns
     
-        # Prepare the Pipeline with all the steps
-        imputer = SimpleImputer(strategy="median")
-        cat_encoder = OneHotEncoder(handle_unknown='ignore')
-        
-        num_pipe = Pipeline([
-            ('imputer', SimpleImputer(strategy='median')),
-            ('scaler', StandardScaler())
-        ])
-        
-        one_hot_pipe = Pipeline([
-            ('imputer', SimpleImputer(strategy=cat_imputer)),
-            ('encoder', OneHotEncoder())
-        ])
-        
-        # Split columns in categorical and numerical
-        num_vars = data_preprocess.drop(columns='income').select_dtypes(exclude=['object']).columns
-        cat_vars = data_preprocess.drop(columns='income').select_dtypes(include=['object']).columns
-        
-        full_pipe = ColumnTransformer([
-            ('num', num_pipe, num_vars),
-            ('cat', one_hot_pipe, cat_vars)
-        ])
-        
-        # Split features and target variables
-        X = data_preprocess.drop('income', axis=1)
-        y = data_preprocess['income']
-        X_train, X_valid, y_train, y_valid = train_test_split(X, y, test_size=0.25, random_state=42)
-        
-        # Apply Transformation
-        full_pipe.fit(X)
-        X_train_ready = full_pipe.transform(X_train)
-        X_valid_ready = full_pipe.transform(X_valid)
+    # Prepare the Pipeline with all the steps
+    imputer = SimpleImputer(strategy="median")
+    cat_encoder = OneHotEncoder(handle_unknown='ignore')
+    num_pipe = Pipeline([
+        ('imputer', SimpleImputer(strategy='median')),
+        ('scaler', StandardScaler())
+    ])
+    one_hot_pipe = Pipeline([
+        ('imputer', SimpleImputer(strategy=cat_imputer)),
+        ('encoder', OneHotEncoder())
+    ])
+    full_pipe = ColumnTransformer([
+        ('num', num_pipe, num_vars),
+        ('cat', one_hot_pipe, cat_vars)
+    ])
+    
+    # Split features and target variables
+    X = data_preprocess.drop('income', axis=1)
+    y = data_preprocess['income']
+    X_train, X_valid, y_train, y_valid = train_test_split(X, y, test_size=0.25, random_state=42)
+    
+    # Apply Transformation
+    full_pipe.fit(X)
+    X_train_ready = full_pipe.transform(X_train)
+    X_valid_ready = full_pipe.transform(X_valid)
 
-        # Create the models
-        log_reg = LogisticRegression(max_iter=n_iter)
-        decission_tree = DecisionTreeClassifier(max_depth=max_depth, min_samples_split=6)
-        
-        print('Predictions using the Logistic Regressor')
-        log_reg, logistic_accu = model_eval(log_reg, X_train_ready, X_valid_ready, y_train, y_valid)
-        
-        print('Predictions using the Decission Tree')
-        decission_tree, tree_accu = model_eval(decission_tree, X_train_ready, X_valid_ready, y_train, y_valid)
-        
-        # Log the metrics to MLFlow
-        mlflow.log_metric("logReg_accuracy", logistic_accu)
-        mlflow.log_metric("tree_accuracy", tree_accu)
-        
-        # Log the model
-        mlflow.sklearn.log_model(log_reg, "LogReg_model")
-        mlflow.sklearn.log_model(decission_tree, "Tree_model")
+    # Create the models
+    log_reg = LogisticRegression(max_iter=n_iter)
+    decission_tree = DecisionTreeClassifier(max_depth=max_depth, min_samples_split=6)
+    
+    print('Predictions using the Logistic Regressor')
+    log_reg, logistic_accu = model_eval(log_reg, X_train_ready, X_valid_ready, y_train, y_valid)
+    
+    print('Predictions using the Decission Tree')
+    decission_tree, tree_accu = model_eval(decission_tree, X_train_ready, X_valid_ready, y_train, y_valid)
+    
+    # Log the metrics to MLFlow
+    mlflow.log_metric("logReg_accuracy", logistic_accu)
+    mlflow.log_metric("tree_accuracy", tree_accu)
+    
+    # Log the model
+    mlflow.sklearn.log_model(log_reg, "LogReg_model")
+    mlflow.sklearn.log_model(decission_tree, "Tree_model")
 
 if __name__ == "__main__":
     main()
