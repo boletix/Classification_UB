@@ -13,6 +13,11 @@ from sklearn.metrics import ConfusionMatrixDisplay
 # Load CSV file
 data = pd.read_csv('adult.csv')
 
+@click.command()
+@click.option("--cat_imputer", default="most_frequent")
+@click.option("--n_iter", default=1000)
+@click.option("--max_depth", default=3)
+
 # Transform income to target
 target_names = data.income.unique()
 data['income'] = data['income'].map({target_names[0]: 0, target_names[1]: 1})
@@ -67,7 +72,7 @@ num_pipe = Pipeline([
 ])
 
 one_hot_pipe = Pipeline([
-    ('imputer', SimpleImputer(strategy='most_frequent')),
+    ('imputer', SimpleImputer(strategy=cat_imputer)),
     ('encoder', OneHotEncoder())
 ])
 
@@ -94,22 +99,32 @@ def display_matrix(y_preds, y_valid, norm='true'):
     ConfusionMatrixDisplay.from_predictions(y_valid, y_preds, normalize=norm, display_labels=target_names)
     plt.show()
 
-def model_eval(model, Xt, Xv, yt, yv, ret=False):
+def model_eval(model, Xt, Xv, yt, yv):
     model.fit(Xt, yt)
     y_preds = model.predict(Xv)
 
     display_matrix(y_preds, yv)
+    accu = accuracy_score(yv, y_preds)
 
-    print('Accuracy for predictions is {:.2%}'.format(accuracy_score(yv, y_preds)))
-    if ret:
-        return model
+    return model, accu
 
 # Create the models
-log_reg = LogisticRegression(max_iter=1000)
-decission_tree = DecisionTreeClassifier(max_depth=5, min_samples_split=6)
+log_reg = LogisticRegression(max_iter=n_iter)
+decission_tree = DecisionTreeClassifier(max_depth=max_depth, min_samples_split=6)
 
 print('Predictions using the Logistic Regressor')
-model_eval(log_reg, X_train_ready, X_valid_ready, y_train, y_valid)
+log_reg, logistic_accu = model_eval(log_reg, X_train_ready, X_valid_ready, y_train, y_valid)
 
 print('Predictions using the Decission Tree')
-tree = model_eval(decission_tree, X_train_ready, X_valid_ready, y_train, y_valid, True)
+decission_tree, tree_accu = model_eval(decission_tree, X_train_ready, X_valid_ready, y_train, y_valid)
+
+# Log the metrics to MLFlow
+mlflow.log_metric("logReg_accuracy", logistic_accu)
+mlflow.log_metric("tree_accuracy", tree_accu)
+
+# Log the model
+mlflow.sklearn.log_model(log_reg, "LogReg_model")
+mlflow.sklearn.log_model(decission_tree, "Tree_model")
+
+if __name__ == "__main__":
+    main()
