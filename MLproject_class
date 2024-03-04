@@ -1,0 +1,9 @@
+conda_env: conda.yml
+
+entry_points:
+  main:
+    command: python main.py --cat_imputer {cat_imputer} --n_iter {n_iter} --max_depth {max_depth} 
+    parameters:
+      cat_imputer: {type: str, default: "most_frequent"}
+      n_iter: {type: int, default: 1000}
+      max_depth: {type: int, default: 3}
