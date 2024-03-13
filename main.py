@@ -68,7 +68,7 @@ def model_eval(model, Xt, Xv, yt, yv):
 
 def main(cat_imputer, n_iter, max_depth):
     # Load CSV file
-    data = pd.read_csv('adult.csv')
+    data = pd.read_csv('https://raw.githubusercontent.com/boletix/Classification_UB/main/adult.csv')
 
     mlflow.log_param("cat_imputer", cat_imputer)
     mlflow.log_param("n_iter", n_iter)
